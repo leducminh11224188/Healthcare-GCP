@@ -1,10 +1,10 @@
 # Google Cloud Build CI/CD Pipeline for Airflow DAGs
 
 substitutions:
-  _PROJECT_ID: "healthcare-gcp-495708"
+  _PROJECT_ID: "healthcare-496102"
   _COMPOSER_ENV: "healthcare-airflow"
   _COMPOSER_REGION: "asia-southeast1"
-  _COMPOSER_BUCKET: "asia-southeast1-healthcare--c7bad9ac-bucket"
+  _COMPOSER_BUCKET: "asia-southeast1-healthcare--325dbf4b-bucket"
 
 steps:
   # Step 1: Validate DAG syntax & imports & run unit tests
