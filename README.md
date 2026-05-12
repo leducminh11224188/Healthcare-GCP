@@ -78,4 +78,4 @@ Healthcare-GCP/
 | Cloud Build | CI/CD pipeline |
 
 
-Dòng này kiểm chứng sự chính xác của CI/CD
+Dòng này kiểm chứng sự chính xác của CI/CD.
