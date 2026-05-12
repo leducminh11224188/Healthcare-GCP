@@ -1,7 +1,7 @@
 set -e  # Exit on first error
 
 # Configuration
-PROJECT_ID="${PROJECT_ID:-healthcare-gcp-495708}"
+PROJECT_ID="${PROJECT_ID:-healthcare-496102}"
 COMPOSER_ENV="${COMPOSER_ENV:-healthcare-airflow}"
 COMPOSER_REGION="${COMPOSER_REGION:-asia-southeast1}"
 DAG_ID="${DAG_ID:-parent_dag}"

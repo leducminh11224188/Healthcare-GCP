@@ -1,7 +1,7 @@
 set -e  # Exit on first error
 
 # Configuration
-COMPOSER_BUCKET="${COMPOSER_BUCKET:-asia-southeast1-healthcare--c7bad9ac-bucket}"
+COMPOSER_BUCKET="${COMPOSER_BUCKET:-asia-southeast1-healthcare--325dbf4b-bucket}"
 
 echo "Deploy Pipeline to GCS"
 echo "Bucket: ${COMPOSER_BUCKET}"
