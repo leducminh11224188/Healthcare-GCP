@@ -77,10 +77,5 @@ Healthcare-GCP/
 | GCS | Landing zone, archive, configs |
 | Cloud Build | CI/CD pipeline |
 
-## Cấu hình
 
-- **Project ID**: `healthcare-gcp-495708`
-- **Region**: `asia-southeast1`
-- **Composer**: `healthcare-airflow`
-- **Dataproc Cluster**: `healthcare-cluster`
-- **GCS Bucket**: `healthcare-bucket-gcp`
+Dòng này kiểm chứng sự chính xác của CI/CD
