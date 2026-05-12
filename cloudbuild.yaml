@@ -1,0 +1,64 @@
+# Google Cloud Build CI/CD Pipeline for Airflow DAGs
+
+substitutions:
+  _PROJECT_ID: "healthcare-gcp-495708"
+  _COMPOSER_ENV: "healthcare-airflow"
+  _COMPOSER_REGION: "asia-southeast1"
+  _COMPOSER_BUCKET: "asia-southeast1-healthcare--c7bad9ac-bucket"
+
+steps:
+  # Step 1: Validate DAG syntax & imports & run unit tests
+  - name: "python:3.11-slim"
+    id: "validate-syntax-and-tests"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        echo "========== Step 1: Validate & Test =========="
+        pip install --quiet -r requirements.txt
+        
+        export AIRFLOW_HOME=/tmp/airflow
+        export AIRFLOW__CORE__LOAD_EXAMPLES=False
+        
+        chmod +x scripts/validate_dag.sh
+        scripts/validate_dag.sh
+        
+        echo "--- Running pytest ---"
+        python -m pytest tests/test_dag_import.py -v --tb=short
+
+  # Step 2: Deploy to GCS & Composer
+  - name: "gcr.io/cloud-builders/gsutil"
+    id: "deploy-dags"
+    entrypoint: "bash"
+    env:
+      - 'COMPOSER_BUCKET=${_COMPOSER_BUCKET}'
+    args:
+      - "-c"
+      - |
+        echo "========== Step 2: Deploy Scripts & DAGs =========="
+        chmod +x scripts/deploy_dag.sh
+        scripts/deploy_dag.sh
+
+  # Step 3: Trigger parent_dag
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: "trigger-dag"
+    entrypoint: "bash"
+    env:
+      - 'PROJECT_ID=${_PROJECT_ID}'
+      - 'COMPOSER_ENV=${_COMPOSER_ENV}'
+      - 'COMPOSER_REGION=${_COMPOSER_REGION}'
+      - 'DAG_ID=parent_dag'
+    args:
+      - "-c"
+      - |
+        echo "========== Step 3: Trigger parent_dag =========="
+        chmod +x scripts/trigger_dag.sh
+        scripts/trigger_dag.sh
+
+# Build options
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: "E2_HIGHCPU_8"
+
+# Timeout for the entire build (30 minutes)
+timeout: "1800s"
