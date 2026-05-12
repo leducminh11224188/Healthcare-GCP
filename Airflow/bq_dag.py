@@ -1,26 +1,28 @@
+import os
 import pendulum
 from airflow import DAG
 from datetime import timedelta
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
-# =========================
 # CONFIG
-# =========================
 PROJECT_ID = "healthcare-496102"
 LOCATION = "asia-southeast1"
 
-SQL_FILE_PATH_1 = "/home/airflow/gcs/data/BQ/bronze.sql"
-SQL_FILE_PATH_2 = "/home/airflow/gcs/data/BQ/silver.sql"
-SQL_FILE_PATH_3 = "/home/airflow/gcs/data/BQ/gold.sql"
+# SQL_FILE_PATH_1 = "/home/airflow/gcs/data/BQ/bronze.sql"
+# SQL_FILE_PATH_2 = "/home/airflow/gcs/data/BQ/silver.sql"
+# SQL_FILE_PATH_3 = "/home/airflow/gcs/data/BQ/gold.sql"
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+SQL_SEARCH_PATH = [os.path.join(CURRENT_DIR, "..", "Medallion BigQuery")]
 
 # Read SQL query from file
-def read_sql_file(file_path: str) -> str:
-    with open(file_path, "r", encoding="utf-8") as file:
-        return file.read()
+# def read_sql_file(file_path: str) -> str:
+#         with open(file_path, "r", encoding="utf-8") as file:
+#             return file.read()
 
-BRONZE_QUERY = read_sql_file(SQL_FILE_PATH_1)
-SILVER_QUERY = read_sql_file(SQL_FILE_PATH_2)
-GOLD_QUERY = read_sql_file(SQL_FILE_PATH_3)
+# BRONZE_QUERY = read_sql_file(SQL_FILE_PATH_1)
+# SILVER_QUERY = read_sql_file(SQL_FILE_PATH_2)
+# GOLD_QUERY = read_sql_file(SQL_FILE_PATH_3)
 
 # Define default arguments
 default_args = {
@@ -44,6 +46,7 @@ with DAG(
     description="DAG to run the bigquery jobs",
     default_args=default_args,
     tags=["gcs", "bq", "etl/elt"],
+    template_searchpath=SQL_SEARCH_PATH,
 ) as dag:
 
     # Task to create bronze table
@@ -53,7 +56,7 @@ with DAG(
         location=LOCATION,
         configuration={
             "query": {
-                "query": BRONZE_QUERY,
+                "query": "bronze.sql",
                 "useLegacySql": False,
                 "priority": "BATCH",
             }
@@ -67,7 +70,7 @@ with DAG(
         location=LOCATION,
         configuration={
             "query": {
-                "query": SILVER_QUERY,
+                "query": "silver.sql",
                 "useLegacySql": False,
                 "priority": "BATCH",
             }
@@ -81,7 +84,7 @@ with DAG(
         location=LOCATION,
         configuration={
             "query": {
-                "query": GOLD_QUERY,
+                "query": "gold.sql",
                 "useLegacySql": False,
                 "priority": "BATCH",
             }
