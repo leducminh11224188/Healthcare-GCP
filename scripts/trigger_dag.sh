@@ -13,8 +13,8 @@ echo "DAG: ${DAG_ID}"
 
 # 1. Wait for DAG to be fully parsed
 echo ""
-echo "Waiting 60s for DAGs to be fully parsed"
-sleep 60
+echo "Waiting 30s for DAGs to be fully parsed"
+sleep 30
 
 # 2. Trigger the DAG
 echo ""

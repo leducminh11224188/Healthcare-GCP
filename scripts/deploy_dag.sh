@@ -51,8 +51,8 @@ gsutil cp Airflow/bq_dag.py "gs://${COMPOSER_BUCKET}/dags/bq_dag.py"
 echo "Deployed: bq_dag.py"
 
 # Wait for child DAGs to register
-echo "Waiting 30s for child DAGs to register..."
-sleep 30
+echo "Waiting 10s for child DAGs to register..."
+sleep 10
 
 # Parent DAG last
 gsutil cp Airflow/parent_dag.py "gs://${COMPOSER_BUCKET}/dags/parent_dag.py"
