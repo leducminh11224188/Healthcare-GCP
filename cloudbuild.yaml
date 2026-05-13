@@ -15,22 +15,21 @@ steps:
       - |
         echo "========== Step 0: Build/Pull CI Image =========="
 
-        # Pull image cũ về để dùng làm cache (bỏ qua lỗi nếu chưa có)
         docker pull ${_CI_IMAGE} || true
 
-        # So sánh hash requirements.txt
-        REMOTE_HASH=$(docker inspect ${_CI_IMAGE} \
+        # Dùng $$ thay vì $ cho biến shell thuần
+        REMOTE_HASH=$$(docker inspect ${_CI_IMAGE} \
           --format '{{index .Config.Labels "req_hash"}}' 2>/dev/null || echo "none")
-        LOCAL_HASH=$(md5sum requirements.txt | cut -d' ' -f1)
+        LOCAL_HASH=$$(md5sum requirements.txt | cut -d' ' -f1)
 
-        echo "Remote hash : $REMOTE_HASH"
-        echo "Local hash  : $LOCAL_HASH"
+        echo "Remote hash : $$REMOTE_HASH"
+        echo "Local hash  : $$LOCAL_HASH"
 
-        if [ "$REMOTE_HASH" != "$LOCAL_HASH" ]; then
+        if [ "$$REMOTE_HASH" != "$$LOCAL_HASH" ]; then
           echo ">>> requirements.txt changed — rebuilding image..."
           docker build \
             --cache-from ${_CI_IMAGE} \
-            --label "req_hash=$LOCAL_HASH" \
+            --label "req_hash=$$LOCAL_HASH" \
             -f Dockerfile.ci \
             -t ${_CI_IMAGE} .
           docker push ${_CI_IMAGE}
