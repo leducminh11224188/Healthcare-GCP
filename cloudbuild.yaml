@@ -1,53 +1,28 @@
+# Google Cloud Build CI/CD Pipeline for Airflow DAGs
+
 substitutions:
   _PROJECT_ID: "healthcare-496102"
   _COMPOSER_ENV: "healthcare-airflow"
   _COMPOSER_REGION: "asia-southeast1"
   _COMPOSER_BUCKET: "asia-southeast1-healthcare--325dbf4b-bucket"
-  _CI_IMAGE: "asia-southeast1-docker.pkg.dev/healthcare-496102/ci-images/airflow-ci:latest"
 
 steps:
-  # Step 0: Build CI image nếu requirements.txt thay đổi
-  - name: "gcr.io/cloud-builders/docker"
-    id: "build-ci-image"
-    entrypoint: "bash"
-    args:
-      - "-c"
-      - |
-        echo "========== Step 0: Build/Pull CI Image =========="
-
-        docker pull ${_CI_IMAGE} || true
-
-        # Dùng $$ thay vì $ cho biến shell thuần
-        REMOTE_HASH=$$(docker inspect ${_CI_IMAGE} \
-          --format '{{index .Config.Labels "req_hash"}}' 2>/dev/null || echo "none")
-        LOCAL_HASH=$$(md5sum requirements.txt | cut -d' ' -f1)
-
-        echo "Remote hash : $$REMOTE_HASH"
-        echo "Local hash  : $$LOCAL_HASH"
-
-        if [ "$$REMOTE_HASH" != "$$LOCAL_HASH" ]; then
-          echo ">>> requirements.txt changed — rebuilding image..."
-          docker build \
-            --cache-from ${_CI_IMAGE} \
-            --label "req_hash=$$LOCAL_HASH" \
-            -f Dockerfile.ci \
-            -t ${_CI_IMAGE} .
-          docker push ${_CI_IMAGE}
-        else
-          echo ">>> requirements.txt unchanged — using cached image."
-        fi
-
-  # Step 1: Validate DAG syntax & run unit tests
-  - name: "${_CI_IMAGE}"
+  # Step 1: Validate DAG syntax & imports & run unit tests
+  - name: "python:3.11-slim"
     id: "validate-syntax-and-tests"
     entrypoint: "bash"
     args:
       - "-c"
       - |
         echo "========== Step 1: Validate & Test =========="
+        pip install --quiet -r requirements.txt
+        
+        export AIRFLOW_HOME=/tmp/airflow
+        export AIRFLOW__CORE__LOAD_EXAMPLES=False
+        
         chmod +x scripts/validate_dag.sh
         scripts/validate_dag.sh
-
+        
         echo "--- Running pytest ---"
         python -m pytest tests/test_dag_import.py -v --tb=short
 
@@ -56,7 +31,7 @@ steps:
     id: "deploy-dags"
     entrypoint: "bash"
     env:
-      - "COMPOSER_BUCKET=${_COMPOSER_BUCKET}"
+      - 'COMPOSER_BUCKET=${_COMPOSER_BUCKET}'
     args:
       - "-c"
       - |
@@ -69,10 +44,10 @@ steps:
     id: "trigger-dag"
     entrypoint: "bash"
     env:
-      - "PROJECT_ID=${_PROJECT_ID}"
-      - "COMPOSER_ENV=${_COMPOSER_ENV}"
-      - "COMPOSER_REGION=${_COMPOSER_REGION}"
-      - "DAG_ID=parent_dag"
+      - 'PROJECT_ID=${_PROJECT_ID}'
+      - 'COMPOSER_ENV=${_COMPOSER_ENV}'
+      - 'COMPOSER_REGION=${_COMPOSER_REGION}'
+      - 'DAG_ID=parent_dag'
     args:
       - "-c"
       - |
@@ -80,7 +55,9 @@ steps:
         chmod +x scripts/trigger_dag.sh
         scripts/trigger_dag.sh
 
+# Build options
 options:
   logging: CLOUD_LOGGING_ONLY
 
+# Timeout for the entire build (30 minutes)
 timeout: "1800s"
