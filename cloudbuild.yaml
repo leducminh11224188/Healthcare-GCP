@@ -3,57 +3,85 @@ substitutions:
   _COMPOSER_ENV: "healthcare-airflow"
   _COMPOSER_REGION: "asia-southeast1"
   _COMPOSER_BUCKET: "asia-southeast1-healthcare--325dbf4b-bucket"
-  # Tên image lưu trên Artifact Registry
-  _CI_IMAGE: "asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/healthcare-repo/de-tester:latest"
+  _CI_IMAGE: "asia-southeast1-docker.pkg.dev/healthcare-496102/ci-images/airflow-ci:latest"
 
 steps:
-  # STEP 1: Validate & Unit Test (Sử dụng Custom Image)
-  # Bước này sẽ cực nhanh vì KHÔNG CẦN pip install nữa
-  - name: "${_CI_IMAGE}"
-    id: "validate-and-test"
+  # Step 0: Build CI image nếu requirements.txt thay đổi
+  - name: "gcr.io/cloud-builders/docker"
+    id: "build-ci-image"
     entrypoint: "bash"
     args:
       - "-c"
       - |
-        echo "========== Step 1: Fast Validation & Test =========="
+        echo "========== Step 0: Build/Pull CI Image =========="
+
+        # Pull image cũ về để dùng làm cache (bỏ qua lỗi nếu chưa có)
+        docker pull ${_CI_IMAGE} || true
+
+        # So sánh hash requirements.txt
+        REMOTE_HASH=$(docker inspect ${_CI_IMAGE} \
+          --format '{{index .Config.Labels "req_hash"}}' 2>/dev/null || echo "none")
+        LOCAL_HASH=$(md5sum requirements.txt | cut -d' ' -f1)
+
+        echo "Remote hash : $REMOTE_HASH"
+        echo "Local hash  : $LOCAL_HASH"
+
+        if [ "$REMOTE_HASH" != "$LOCAL_HASH" ]; then
+          echo ">>> requirements.txt changed — rebuilding image..."
+          docker build \
+            --cache-from ${_CI_IMAGE} \
+            --label "req_hash=$LOCAL_HASH" \
+            -f Dockerfile.ci \
+            -t ${_CI_IMAGE} .
+          docker push ${_CI_IMAGE}
+        else
+          echo ">>> requirements.txt unchanged — using cached image."
+        fi
+
+  # Step 1: Validate DAG syntax & run unit tests
+  - name: "${_CI_IMAGE}"
+    id: "validate-syntax-and-tests"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        echo "========== Step 1: Validate & Test =========="
         chmod +x scripts/validate_dag.sh
-        ./scripts/validate_dag.sh
-        
+        scripts/validate_dag.sh
+
         echo "--- Running pytest ---"
         python -m pytest tests/test_dag_import.py -v --tb=short
 
-  # STEP 2: Deploy to GCS & Composer
+  # Step 2: Deploy to GCS & Composer
   - name: "gcr.io/cloud-builders/gsutil"
     id: "deploy-dags"
     entrypoint: "bash"
     env:
-      - 'COMPOSER_BUCKET=${_COMPOSER_BUCKET}'
+      - "COMPOSER_BUCKET=${_COMPOSER_BUCKET}"
     args:
       - "-c"
       - |
-        echo "========== Step 2: Deploying to ${_COMPOSER_BUCKET} =========="
+        echo "========== Step 2: Deploy Scripts & DAGs =========="
         chmod +x scripts/deploy_dag.sh
-        ./scripts/deploy_dag.sh
+        scripts/deploy_dag.sh
 
-  # STEP 3: Trigger Airflow DAG
+  # Step 3: Trigger parent_dag
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: "trigger-dag"
     entrypoint: "bash"
     env:
-      - 'PROJECT_ID=${_PROJECT_ID}'
-      - 'COMPOSER_ENV=${_COMPOSER_ENV}'
-      - 'COMPOSER_REGION=${_COMPOSER_REGION}'
-      - 'DAG_ID=parent_dag'
+      - "PROJECT_ID=${_PROJECT_ID}"
+      - "COMPOSER_ENV=${_COMPOSER_ENV}"
+      - "COMPOSER_REGION=${_COMPOSER_REGION}"
+      - "DAG_ID=parent_dag"
     args:
       - "-c"
       - |
-        echo "========== Step 3: Triggering DAG ${DAG_ID} =========="
+        echo "========== Step 3: Trigger parent_dag =========="
         chmod +x scripts/trigger_dag.sh
-        ./scripts/trigger_dag.sh
+        scripts/trigger_dag.sh
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  # Tăng tốc độ bằng cách sử dụng máy build cấu hình cao hơn (tùy chọn)
-  machineType: 'E2_HIGHCPU_8'
 
-timeout: "1200s"
+timeout: "1800s"
