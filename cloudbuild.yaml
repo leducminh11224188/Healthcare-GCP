@@ -1,32 +1,28 @@
-# Google Cloud Build CI/CD Pipeline for Airflow DAGs
-
 substitutions:
   _PROJECT_ID: "healthcare-496102"
   _COMPOSER_ENV: "healthcare-airflow"
   _COMPOSER_REGION: "asia-southeast1"
   _COMPOSER_BUCKET: "asia-southeast1-healthcare--325dbf4b-bucket"
+  # Tên image lưu trên Artifact Registry
+  _CI_IMAGE: "asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/healthcare-repo/de-tester:latest"
 
 steps:
-  # Step 1: Validate DAG syntax & imports & run unit tests
-  - name: "python:3.11-slim"
-    id: "validate-syntax-and-tests"
+  # STEP 1: Validate & Unit Test (Sử dụng Custom Image)
+  # Bước này sẽ cực nhanh vì KHÔNG CẦN pip install nữa
+  - name: "${_CI_IMAGE}"
+    id: "validate-and-test"
     entrypoint: "bash"
     args:
       - "-c"
       - |
-        echo "========== Step 1: Validate & Test =========="
-        pip install --quiet -r requirements.txt
-        
-        export AIRFLOW_HOME=/tmp/airflow
-        export AIRFLOW__CORE__LOAD_EXAMPLES=False
-        
+        echo "========== Step 1: Fast Validation & Test =========="
         chmod +x scripts/validate_dag.sh
-        scripts/validate_dag.sh
+        ./scripts/validate_dag.sh
         
         echo "--- Running pytest ---"
         python -m pytest tests/test_dag_import.py -v --tb=short
 
-  # Step 2: Deploy to GCS & Composer
+  # STEP 2: Deploy to GCS & Composer
   - name: "gcr.io/cloud-builders/gsutil"
     id: "deploy-dags"
     entrypoint: "bash"
@@ -35,11 +31,11 @@ steps:
     args:
       - "-c"
       - |
-        echo "========== Step 2: Deploy Scripts & DAGs =========="
+        echo "========== Step 2: Deploying to ${_COMPOSER_BUCKET} =========="
         chmod +x scripts/deploy_dag.sh
-        scripts/deploy_dag.sh
+        ./scripts/deploy_dag.sh
 
-  # Step 3: Trigger parent_dag
+  # STEP 3: Trigger Airflow DAG
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     id: "trigger-dag"
     entrypoint: "bash"
@@ -51,13 +47,13 @@ steps:
     args:
       - "-c"
       - |
-        echo "========== Step 3: Trigger parent_dag =========="
+        echo "========== Step 3: Triggering DAG ${DAG_ID} =========="
         chmod +x scripts/trigger_dag.sh
-        scripts/trigger_dag.sh
+        ./scripts/trigger_dag.sh
 
-# Build options
 options:
   logging: CLOUD_LOGGING_ONLY
+  # Tăng tốc độ bằng cách sử dụng máy build cấu hình cao hơn (tùy chọn)
+  machineType: 'E2_HIGHCPU_8'
 
-# Timeout for the entire build (30 minutes)
-timeout: "1800s"
+timeout: "1200s"
